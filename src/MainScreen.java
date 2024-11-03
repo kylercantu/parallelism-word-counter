@@ -7,7 +7,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 public class MainScreen {
     private JPanel mainPanel;
@@ -18,14 +21,11 @@ public class MainScreen {
     private JTextArea fileTextArea;
     private JTextArea withoutTextArea;
     public JTextArea withTextArea;
-    private JButton runBtn;
-
-    //AtomicInteger for thread-safe counting when Multithreading
-    private static AtomicInteger totalWords = new AtomicInteger(0);
-    private static AtomicInteger totalTime = new AtomicInteger(0);
+    private JButton withBtn;
+    private JButton withoutBtn;
 
 
-    public MainScreen(){
+    public MainScreen() {
         setDisplay();
         addFileBtn.addActionListener(new ActionListener() {
             @Override
@@ -34,11 +34,17 @@ public class MainScreen {
             }
         });
 
-        runBtn.addActionListener(new ActionListener() {
+        withBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                readWithParallelism();
+            }
+        });
+
+        withoutBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 readWithoutParallelism();
-                readWithParallelism();
             }
         });
     }//End constructor
@@ -46,7 +52,7 @@ public class MainScreen {
 
     private void setDisplay() {
         JFrame frame = new JFrame("File Processing - Word Counter");
-        frame.setSize(900,900);
+        frame.setSize(900, 900);
         frame.setLocationRelativeTo(null);
         frame.setResizable(false);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -55,10 +61,10 @@ public class MainScreen {
     }//End setDisplay
 
 
-    private void uploadFile(){
+    private void uploadFile() {
         JFileChooser fileChooser = new JFileChooser();
         int result = fileChooser.showOpenDialog(null);
-        if(result == JFileChooser.APPROVE_OPTION) {
+        if (result == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
             fileTextArea.append(selectedFile.getAbsolutePath() + "\n");
         } else {
@@ -83,12 +89,11 @@ public class MainScreen {
         return uploadedFilesList;
     }//End getListOfFiles
 
-
-    private void readWithoutParallelism(){
+    private void readWithoutParallelism() {
         List<File> fileList = getListOfFiles();
         int totalWords = 0;
         int totalTime = 0;
-//        long startSequential = System.currentTimeMillis();
+        long startSequential = System.currentTimeMillis();
 
         for (File file : fileList) {
             long startFileRead = System.currentTimeMillis();
@@ -102,83 +107,51 @@ public class MainScreen {
             }
             long endFileRead = System.currentTimeMillis();
             totalTime += (endFileRead - startFileRead);
-            withoutTextArea.append("Time taken to read " + file.getName() + ": " + (endFileRead - startFileRead) + " ms\n");
+//            withoutTextArea.append("Time taken to read " + file.getName() + ": " + (endFileRead - startFileRead) + " ms\n");
 
         }
-//        long endSequential = System.currentTimeMillis();
+        long endSequential = System.currentTimeMillis();
 
 
         withoutTextArea.append("Total words (Sequential): " + totalWords + "\n");
-        withoutTextArea.append("Total Time taken (Sequential): " + totalTime + " ms");
+        withoutTextArea.append("Total Time taken (Sequential): " + (endSequential - startSequential) + " ms\n");
 
     }//End readWithoutParallelism
 
-    public void readWithParallelism(){
 
+    private void readWithParallelism() {
         List<File> fileList = getListOfFiles();
-        List<Thread> threadList = new ArrayList<>();
-        totalWords.set(0);
-        totalTime.set(0);
+        AtomicInteger totalWords = new AtomicInteger(0); //Use AtomicInteger for thread safety
+        ExecutorService executor = Executors.newFixedThreadPool(fileList.size()); //Create thread pool depending on how many files are in the list (1 thread per file)
+        long startExec = System.currentTimeMillis(); //Start time for parallel execution
 
-
-        for(File file: fileList){
-            Multithread multithread = new Multithread(file);
-            threadList.add(multithread);
-            multithread.start();
+        //Each file is ran using the executor runnable
+        for (File file : fileList) {
+            executor.submit(newRunnable(file, totalWords));
         }
 
-        for (Thread thread : threadList) {
-            try {
-                thread.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
+        //Shutdown the executor and wait for all tasks to finish
+        executor.shutdown();
 
-
+        long endExec = System.currentTimeMillis(); // End time for parallel execution
         withTextArea.append("Total words (Parallel): " + totalWords.get() + "\n");
-        withTextArea.append("Total Time taken (Parallel): " + totalTime.get() + " ms\n");
-
-
+        withTextArea.append("Total Time taken (Parallel): " + (endExec - startExec) + " ms\n");
     }//End readWithParallelism
 
-    class Multithread extends Thread {
-
-        private File file;
-
-        public Multithread(File file){
-            this.file = file;
-        }
-
-        //When thread.start() is called, the instructions in run() executes
-        @Override
-        public void run(){
-            List<File> fileList = getListOfFiles();
-            int words = 0;
-            int time = 0;
-            long startFileRead = System.currentTimeMillis();
-
-
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    words += line.split("\\s+").length;
+    private Runnable newRunnable(File file, AtomicInteger totalWords) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        totalWords.addAndGet(line.split("\\s+").length);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
-            long endFileRead = System.currentTimeMillis();
-            time += (endFileRead - startFileRead);
-
-            totalTime.addAndGet(time);
-            totalWords.addAndGet(words);
-
-            withTextArea.append("Time taken to read " + file.getName() + ": " + (endFileRead - startFileRead) + " ms\n");
-
-        }//End run
-
-
-    }//End Multithread class
-
+        };
+    }//End newRunnable
 
 }//End class
