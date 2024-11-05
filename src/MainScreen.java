@@ -9,8 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 public class MainScreen {
     private JPanel mainPanel;
@@ -23,7 +24,6 @@ public class MainScreen {
     public JTextArea withTextArea;
     private JButton withBtn;
     private JButton withoutBtn;
-
 
     public MainScreen() {
         setDisplay();
@@ -122,7 +122,7 @@ public class MainScreen {
     private void readWithParallelism() {
         List<File> fileList = getListOfFiles();
         AtomicInteger totalWords = new AtomicInteger(0); //Use AtomicInteger for thread safety
-        ExecutorService executor = Executors.newFixedThreadPool(fileList.size()); //Create thread pool depending on how many files are in the list (1 thread per file)
+        ExecutorService executor = Executors.newFixedThreadPool(fileList.size()); //Fixed thread pool consisting of how many files are in the List
         long startExec = System.currentTimeMillis(); //Start time for parallel execution
 
         //Each file is ran using the executor runnable
@@ -132,6 +132,18 @@ public class MainScreen {
 
         //Shutdown the executor and wait for all tasks to finish
         executor.shutdown();
+
+        //Security measure to ensure all tasks are either completed or stopped after a certain time limit
+        try {
+            //Wait for a maximum of 1 minute for all tasks to finish - if a task did not complete, shutdown
+            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+                executor.shutdownNow(); //Force shutdown if tasks did not finish
+                withTextArea.append("A task did not complete.\n");
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt(); //Preserve interrupt status
+        }
 
         long endExec = System.currentTimeMillis(); // End time for parallel execution
         withTextArea.append("Total words (Parallel): " + totalWords.get() + "\n");
