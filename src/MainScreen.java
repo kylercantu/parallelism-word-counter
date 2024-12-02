@@ -92,11 +92,9 @@ public class MainScreen {
     private void readWithoutParallelism() {
         List<File> fileList = getListOfFiles();
         int totalWords = 0;
-        int totalTime = 0;
         long startSequential = System.currentTimeMillis();
 
         for (File file : fileList) {
-            long startFileRead = System.currentTimeMillis();
             try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
@@ -105,10 +103,6 @@ public class MainScreen {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            long endFileRead = System.currentTimeMillis();
-            totalTime += (endFileRead - startFileRead);
-//            withoutTextArea.append("Time taken to read " + file.getName() + ": " + (endFileRead - startFileRead) + " ms\n");
-
         }
         long endSequential = System.currentTimeMillis();
 
