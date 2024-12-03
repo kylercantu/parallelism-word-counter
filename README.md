@@ -11,6 +11,6 @@ How to Run:
    
 4) After obtaining the text files to use for testing, click the "ADD FILE" button which will open up a second screen that will allow you to navigate and find those files. After clicking the file that you want to use, the path will be displayed in the box above the button.
 
-5) Once the text files are uploaded, choose either the button "RUN PARALLELISM" to run the program using parallelism or the button "RUN SEQUENTIAL" too run the program sequentially.
+5) Once the text files are uploaded, choose either the button "RUN PARALLELISM" to run the program using parallelism or the button "RUN SEQUENTIAL" to run the program sequentially.
    
 6) Depending on which button you clicked, the total words and total execution time will be displayed in their respected boxes above the button.
